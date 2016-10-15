@@ -2,40 +2,59 @@ import cv2
 import numpy as np
 import urllib
 
+
+slider_name = 'Adjust HSV threshold'
+
+
 def nothing(x):
-    pass
+    hLow, sLow, vLow, hHigh, sHigh, vHigh = getTrackbars()
+    lower_range = np.array([hLow, sLow, vLow], np.uint8)
+    higher_range = np.array([hHigh, sHigh, vHigh], np.uint8)
+    hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_RGB2HSV), lower_range, higher_range);
 
 def createTrackbars():
-    cv2.createTrackbar('H low', 'image', 0, 180, nothing)
-    cv2.createTrackbar('S low', 'image', 0, 255, nothing)
-    cv2.createTrackbar('V low', 'image', 0, 255, nothing)
-    cv2.createTrackbar('H high', 'image', 180, 180, nothing)
-    cv2.createTrackbar('S high', 'image', 255, 255, nothing)
-    cv2.createTrackbar('V high', 'image', 255, 255, nothing)
-    
+    cv2.createTrackbar('H low', slider_name, 0, 180, nothing)
+    cv2.createTrackbar('S low', slider_name, 0, 255, nothing)
+    cv2.createTrackbar('V low', slider_name, 0, 255, nothing)
+    cv2.createTrackbar('H high', slider_name, 180, 180, nothing)
+    cv2.createTrackbar('S high', slider_name, 255, 255, nothing)
+    cv2.createTrackbar('V high', slider_name, 255, 255, nothing)
+
+def getTrackbars():
+    retval = []
+    bar_names = ['H low', 'S low', 'V low', 'H high', 'S high', 'V high']
+    for i in range(0, 6):
+        retval.append(cv2.getTrackbarPos(bar_names[i], slider_name))
+    return retval
+
+def getHSV(event, x,  y, flags, param):
+    if event == cv2.EVENT_LBUTTONDOWN:
+        print cv2.cvtColor(img[y:y+1, x:x+1, :], cv2.COLOR_BGR2HSV)
+        
 cap = cv2.VideoCapture(0)
 
-cv2.namedWindow('image')
+cv2.namedWindow('Adjust HSV threshold')
+cv2.namedWindow('Original image')
 
-#cv2.resize('image', (200, 400))
+cv2.setMouseCallback('Original image', getHSV)
 
 createTrackbars()
 
-while True:
-    hLow = cv2.getTrackbarPos('H low', 'image')
-    sLow = cv2.getTrackbarPos('S low', 'image')
-    vLow = cv2.getTrackbarPos('V low', 'image')
-    hHigh = cv2.getTrackbarPos('H high', 'image')
-    sHigh = cv2.getTrackbarPos('S high', 'image')
-    vHigh = cv2.getTrackbarPos('V high', 'image')
+while cap.isOpened():
+    hLow, sLow, vLow, hHigh, sHigh, vHigh = getTrackbars()
     lower_range = np.array([hLow, sLow, vLow], np.uint8)
     higher_range = np.array([hHigh, sHigh, vHigh], np.uint8)
     ret, img = cap.read()
+##    img = cv2.imread('Images/opencv-logo.png')
+    img = cv2.resize(img, (320, 240))
     kernel = np.ones((5,5),np.uint8)
-    #mod = cv2.morphologyEx(img, cv2.MORPH_CROSS, kernel)
-    mod = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_RGB2HSV), lower_range, higher_range);
-    cv2.imshow('wtf', img)
-    cv2.imshow('kek', mod)
-    if cv2.waitKey(1) == ord('q'):
+    hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower_range, higher_range);
+    mod = cv2.morphologyEx(cv2.morphologyEx(hsv, cv2.MORPH_CLOSE, kernel), cv2.MORPH_OPEN, kernel)
+    cv2.imshow('Original image', img)
+    cv2.imshow('kek', hsv)
+    key = cv2.waitKey(1)
+    if key == ord('q'):
         break
+    elif key == ord('p'):
+        cv2.waitKey(0)
 cv2.destroyAllWindows()
