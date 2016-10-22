@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import urllib
+import urllib2
 
 
 slider_name = 'Adjust HSV threshold'
@@ -10,7 +10,8 @@ def nothing(x):
     hLow, sLow, vLow, hHigh, sHigh, vHigh = getTrackbars()
     lower_range = np.array([hLow, sLow, vLow], np.uint8)
     higher_range = np.array([hHigh, sHigh, vHigh], np.uint8)
-    hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_RGB2HSV), lower_range, higher_range);
+    hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower_range, higher_range);
+    cv2.imshow("Filtered", hsv)
 
 def createTrackbars():
     cv2.createTrackbar('H low', slider_name, 0, 180, nothing)
@@ -31,7 +32,7 @@ def getHSV(event, x,  y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
         print cv2.cvtColor(img[y:y+1, x:x+1, :], cv2.COLOR_BGR2HSV)
         
-cap = cv2.VideoCapture(0)
+##cap = cv2.VideoCapture(0)
 
 cv2.namedWindow('Adjust HSV threshold')
 cv2.namedWindow('Original image')
@@ -40,21 +41,31 @@ cv2.setMouseCallback('Original image', getHSV)
 
 createTrackbars()
 
-while cap.isOpened():
-    hLow, sLow, vLow, hHigh, sHigh, vHigh = getTrackbars()
-    lower_range = np.array([hLow, sLow, vLow], np.uint8)
-    higher_range = np.array([hHigh, sHigh, vHigh], np.uint8)
-    ret, img = cap.read()
-##    img = cv2.imread('Images/opencv-logo.png')
-    img = cv2.resize(img, (320, 240))
-    kernel = np.ones((5,5),np.uint8)
-    hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower_range, higher_range);
-    mod = cv2.morphologyEx(cv2.morphologyEx(hsv, cv2.MORPH_CLOSE, kernel), cv2.MORPH_OPEN, kernel)
-    cv2.imshow('Original image', img)
-    cv2.imshow('kek', hsv)
-    key = cv2.waitKey(1)
-    if key == ord('q'):
-        break
-    elif key == ord('p'):
-        cv2.waitKey(0)
+stream = urllib2.urlopen("http://192.168.2.101:8080/videofeed")
+bytes=''
+##while cap.isOpened():
+while True:
+    bytes += stream.read(1024)
+    a = bytes.find('\xff\xd8')
+    b = bytes.find('\xff\xd9')
+    if a!=-1 and b!=-1:
+        jpg = bytes[a:b+2]
+        bytes = bytes[b+2:]
+        img = cv2.imdecode(np.fromstring(jpg, np.uint8), 1)
+        hLow, sLow, vLow, hHigh, sHigh, vHigh = getTrackbars()
+        lower_range = np.array([hLow, sLow, vLow], np.uint8)
+        higher_range = np.array([hHigh, sHigh, vHigh], np.uint8)
+    ##    ret, img = cap.read()
+    ##    img = cv2.imread('Images/opencv-logo.png')
+        img = cv2.resize(img, (640, 480))
+        kernel = np.ones((5,5),np.uint8)
+        hsv = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower_range, higher_range);
+        mod = cv2.morphologyEx(cv2.morphologyEx(hsv, cv2.MORPH_CLOSE, kernel), cv2.MORPH_OPEN, kernel)
+        cv2.imshow('Original image', img)
+        cv2.imshow('Filtered', hsv)
+        key = cv2.waitKey(1)
+        if key == ord('q'):
+            break
+        elif key == ord('p'):
+            cv2.waitKey(0)
 cv2.destroyAllWindows()
