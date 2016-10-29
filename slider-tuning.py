@@ -34,7 +34,7 @@ def getHSV(event, x,  y, flags, param):
         
 ##cap = cv2.VideoCapture(0)
 
-cv2.namedWindow('Adjust HSV threshold')
+cv2.namedWindow('Adjust HSV threshold', cv2.WINDOW_NORMAL)
 cv2.namedWindow('Original image')
 
 cv2.setMouseCallback('Original image', getHSV)
@@ -67,5 +67,7 @@ while True:
         if key == ord('q'):
             break
         elif key == ord('p'):
-            cv2.waitKey(0)
+            key = cv2.waitKey(0)
+            if key == ord('q'):
+                break
 cv2.destroyAllWindows()
