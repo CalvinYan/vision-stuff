@@ -3,9 +3,9 @@ import numpy as np
 import urllib2
 import math
 
-cap = cv2.VideoCapture(0)
+##cap = cv2.VideoCapture(0)
 
-lowrange = np.array([10,150,100], np.uint8)
+lowrange = np.array([10,150,160], np.uint8)
 highrange = np.array([30,255,255], np.uint8)
 
 stream = urllib2.urlopen("http://192.168.2.101:8080/videofeed")
@@ -29,40 +29,72 @@ def findCenter():
         bottomLeft = [contour[0][0], contour[0][1]]
         topRight = [contour[-1][0], contour[-1][1]]
         dst = np.array([topLeft, topRight, bottomLeft, bottomRight], np.float32)
-        for i in range(0, 4):
-            cv2.circle(img, (dst[i][0], dst[i][1]), 5, colors[i], -1)
+        for i,v in enumerate(dst):
+            cv2.circle(img, (v[0], v[1]), 5, colors[i], -1)
         M, _ = cv2.findHomography(src, dst, cv2.RANSAC)
-##        transform = np.multiply(intrinsic, np.linalg.inv(intrinsic))
-        transform = np.divide(M, intrinsic)
-        print M
-        print transform
-##        print cv2.getRotationMatrix2D((160, 120), 10, 1.0)
-##        print M
-##        print np.multiply(transform, intrinsic)
-##        center = np.multiply(np.multiply(transform, intrinsic), np.array([160, 120, 1], np.float32))
-        center = cv2.perspectiveTransform(np.array([[[320, 192]]], np.float32), M)
-##        print center
-        M, _ = cv2.findHomography(dst, src, cv2.RANSAC)
-        M[0:2, 2:3] = np.array([[0], [0]], np.float32)
-##        intrinsic[0:2, 2:3] = np.zeros((2, 1))
-        center = center[0][0]
-        cv2.line(img, (320, 240), (center[0], center[1]), (0, 255, 0), 2)
-        return dst, center
+        if M is not None:
+            center = cv2.perspectiveTransform(np.array([[[320, 192]]], np.float32), M)
+            M, _ = cv2.findHomography(dst, src, cv2.RANSAC)
+            M[0:2, 2:3] = np.array([[0], [0]], np.float32)
+            center = center[0][0]
+            cv2.line(img, (320, 240), (center[0], center[1]), (0, 255, 0), 2)
+            return M, center
+        else:
+            return None, None
         
+def findPose():
+    col1 = np.array(M[:,0])
+    col2 = np.array(M[:,1])
+    col3 = np.cross(col1, col2)
+    col4 = np.array(M[:, 2])
+    projection = np.column_stack((col1, col2, col3, col4))
+    camera, rotation, translation, rotX, rotY, rotZ, euler = cv2.decomposeProjectionMatrix(projection)
+    #print np.divide(camera, camera[2, 2])
+##    euler = np.array([np.degrees(x) for x in euler], np.float32)
+##    print euler
+    print rotY
+    print translation
 
+def checkPose(rotX, rotY, rotZ, translation):
+    pass
+    
+    
 def findDepth():
     x, y, w, h = cv2.boundingRect(contours[0])
-##    print "Width: %s" % w
     if w > 0:
         zDist = (20 * 620) / w
-        print "Distance to goal: %s" % zDist
+##        print "Distance to goal: %s" % zDist
         xDist = (center[0] - 320) / w * 20
-        print "Distance to center: %s" % xDist
+##        print "Distance to center: %s" % xDist
         azimuth = math.degrees(math.atan(xDist / zDist))
-        print "Azimuth angle: %s" % azimuth
+##        print "Azimuth angle: %s" % azimuth
         cv2.putText(img, "%s" % azimuth, (0, 479), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
 
+def getRotationMatrix(M):
+    w = 640
+    h = 480
+    f = 620
+    A1 = np.array([[1, 0, -w/2],
+                   [0, 1, -h/2],
+                   [0, 0,    0],
+                   [0, 0,    1]])
+    A2 = np.array([[f, 0, -w/2, 0],
+                   [0, f, -h/2, 0],
+                   [0, 0,    1, 0]])
     
+
+def rotations(M):
+    sy = math.sqrt(M[0,0] * M[0,0] + M[1,0] * M[1,0])
+    singular = sy < 1e-6
+    if singular:
+        x = math.atan(-M[1,2] / M[1,1])
+        y = math.atan(-M[2,0] / sy)
+        z = 0
+    else:
+        x = math.atan(M[2,1] / M[2,2])
+        y = math.atan(-M[2,0] / sy)
+        z = math.atan(M[1,0] / M[0,0])
+    return np.array([x, y, x])
 
 while True:
     bytes += stream.read(1024)
@@ -75,12 +107,16 @@ while True:
         img = cv2.resize(img, (640, 480))
         binary = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lowrange, highrange)
         cv2.imshow("Filtered", binary)
-        contours, hierarchy = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+        _, contours, _ = cv2.findContours(binary, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         cv2.drawContours(img, contours, 0, (0, 255, 0), 2)
         if len(contours) > 0: 
-            dst, center = findCenter()
-            findDepth()
+            M, center = findCenter()
+            if M is not None:
+                findDepth()
+                print "Rotations:"
+                print rotations(M)
+                findPose()
         cv2.imshow("contour", img)
         key = cv2.waitKey(1)
         if key == ord('q'):
