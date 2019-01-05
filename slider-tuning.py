@@ -3,7 +3,7 @@ import numpy as np
 import urllib2
 
 slider_name = 'Adjust HSV threshold'
-
+print cv2.__version__
 # Receive the min and max HSV values and filter the image accordingly
 def updateThreshold():
     low, high = getTrackbars()
@@ -43,37 +43,23 @@ cv2.setMouseCallback('Original image', getHSV)
 createTrackbars()
 
 # Connect to the camera
-stream = urllib2.urlopen("http://192.168.2.101:8080/videofeed")
-bytes=''
+
 paused = False
+
+cam = cv2.VideoCapture(0)
+img = None
 while True:
-
-    # Read from the camera feed. \xff\xd8 marks the beginning of an image in the
-    # byte stream and \xff\xd9 represents the end.
-    bytes += stream.read(1024)
-    a = bytes.find('\xff\xd8')
-    b = bytes.find('\xff\xd9')
+    if not paused:
+        retval, img = cam.read()
+        img = cv2.flip(img, 1)
+    cv2.imshow('Original image', img)
+    updateThreshold()
     
-    if a!=-1 and b!=-1:
-
-        # Get raw image data and empty the bytes array
-        jpg = bytes[a:b+2]
-        bytes = bytes[b+2:]
-        # Translate the image into a readable format and resize it
-        img = cv2.imdecode(np.fromstring(jpg, np.uint8), 1)
-        img = cv2.resize(img, (640, 480))
-
-        # Display the camera feed if the program is not paused and filter it
-        if not paused:
-            cv2.imshow('Original image', img)
-            updateThreshold()
-
-        # Press 'q' to exit the program and 'p' to pause and unpause
-        key = cv2.waitKey(1)
-        if key == ord('q'):
-            break
-        elif key == ord('p'):
-            paused = not paused
+    key = cv2.waitKey(1)
+    if key == ord('q'):
+        break
+    elif key == ord('p'):
+        paused = not paused
 cv2.destroyAllWindows()
         
 
